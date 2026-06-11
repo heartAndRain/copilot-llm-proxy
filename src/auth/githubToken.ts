@@ -108,7 +108,7 @@ export async function findGitHubOAuthToken(overrideEnv?: string): Promise<GitHub
   if (fromGh) return fromGh;
   throw new Error(
     "Could not find a GitHub Copilot OAuth token. " +
-      "Run `copilot-llm-proxy login` to sign in, " +
+      "Run `cllmp login` to sign in, " +
       "or set the GH_COPILOT_TOKEN env var.",
   );
 }

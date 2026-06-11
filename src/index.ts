@@ -23,7 +23,7 @@ program
 
 const serveCommand = (name: string, description: string) =>
   program
-    .command(name, name === "serve" ? { isDefault: true } : {})
+    .command(name)
     .description(description)
     .option("-p, --port <port>", "port to listen on", (v) => Number(v))
     .option("-H, --host <host>", "host/interface to bind to")
@@ -43,11 +43,12 @@ const serveCommand = (name: string, description: string) =>
       }
     });
 
-serveCommand("serve", "Run the proxy server (default).");
-serveCommand("start", "Alias for `serve`. Start the proxy server.");
+serveCommand("start", "Start the proxy server.");
+serveCommand("serve", "Alias for `start`. Run the proxy server.");
 
 program
   .command("login")
+  .alias("signin")
   .description("Sign in to GitHub Copilot via device-code flow and persist the OAuth token.")
   .action(async () => {
     const config = loadConfig();
@@ -68,6 +69,7 @@ program
 
 program
   .command("logout")
+  .alias("signout")
   .description("Remove the persisted OAuth token.")
   .action(async () => {
     const file = authFilePath();
@@ -254,6 +256,10 @@ function printSetupSummary(
     for (const step of nextSteps) console.log(`  • ${step}`);
   }
 }
+
+program
+  .showHelpAfterError("(run `cllmp --help` to see all commands)")
+  .showSuggestionAfterError(true);
 
 program.parseAsync(process.argv);
 
