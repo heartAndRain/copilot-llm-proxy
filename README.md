@@ -1,5 +1,8 @@
 # copilot-llm-proxy
 
+[![npm version](https://img.shields.io/npm/v/copilot-llm-proxy.svg)](https://www.npmjs.com/package/copilot-llm-proxy)
+[![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 Local HTTP proxy that exposes the **GitHub Copilot LLM backend** (Claude,
 GPT, Gemini, etc. — whatever your Copilot subscription gives you) via APIs
 compatible with:
@@ -25,14 +28,30 @@ Anthropic or OpenAI APIs directly.
   the standard Copilot Chat client ID). VS Code / `gh` sessions are also
   picked up automatically if present.
 
-## Install & build
+## Install
+
+Install the published package globally — `cllmp` lands on your PATH:
 
 ```powershell
-cd path/to/copilot-llm-proxy
+npm install -g copilot-llm-proxy
+```
+
+To upgrade later: `npm install -g copilot-llm-proxy@latest`.
+
+<details>
+<summary>Install from source (development)</summary>
+
+```powershell
+git clone https://github.com/heartAndRain/copilot-llm-proxy.git
+cd copilot-llm-proxy
 npm install
 npm run build
 npm link        # makes `cllmp` available globally
 ```
+</details>
+
+See [INSTALL.md](INSTALL.md) for offline / portable / per-machine install
+recipes.
 
 ## Sign in
 

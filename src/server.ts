@@ -7,9 +7,8 @@ import { createOpenAIRouter } from "./routes/openai.js";
 import { createAnthropicRouter } from "./routes/anthropic.js";
 import { createResponsesRouter } from "./routes/responses.js";
 import { findGitHubOAuthToken } from "./auth/githubToken.js";
+import { VERSION } from "./util/version.js";
 import { log } from "./util/logger.js";
-
-const VERSION = "0.1.0";
 
 export async function startServer(config: Config) {
   const tokens = new CopilotTokenManager({

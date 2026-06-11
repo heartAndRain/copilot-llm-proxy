@@ -11,11 +11,12 @@ import { setupCodex } from "./setup/codex.js";
 import { setupClaude, CLAUDE_USE_CLIENT_DEFAULT } from "./setup/claude.js";
 import { pickModelInteractive } from "./setup/modelPicker.js";
 import { CopilotClient } from "./copilot/client.js";
+import { VERSION } from "./util/version.js";
 
 const program = new Command();
 program
   .name("cllmp")
-  .version("0.1.0", "-V, --version", "print version and exit")
+  .version(VERSION, "-V, --version", "print version and exit")
   .description(
     "copilot-llm-proxy — local proxy that exposes GitHub Copilot's LLM backend via OpenAI- and Anthropic-compatible HTTP APIs.",
   );

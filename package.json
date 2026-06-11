@@ -1,6 +1,6 @@
 {
   "name": "copilot-llm-proxy",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Local proxy that exposes GitHub Copilot's LLM backend via OpenAI- (chat-completions + responses) and Anthropic-compatible (messages) HTTP APIs. Use Claude Code CLI, Codex CLI, and Codex Desktop with your Copilot subscription.",
   "type": "module",
   "license": "MIT",
