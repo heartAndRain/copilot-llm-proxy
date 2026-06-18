@@ -12,13 +12,29 @@ compatible with:
   GPT-5.x and reasoning models that aren't on chat-completions)
 - **Anthropic Messages** — `POST /v1/messages` (translated → chat-completions)
 
-This lets you point local tools such as **Claude Code CLI**, **Codex CLI**,
-and **Codex Desktop** at your Copilot subscription instead of paying for the
-Anthropic or OpenAI APIs directly.
+This lets you point local coding agents and chat tools at your Copilot
+subscription instead of paying for the Anthropic or OpenAI APIs directly.
 
 > ⚠️ This uses the same backend the official Copilot Chat extension uses.
 > Make sure your usage complies with the
 > [GitHub Copilot Acceptable Use Policy](https://docs.github.com/en/site-policy/acceptable-use-policies/github-copilot-coding-agent).
+
+## Supported clients (harnesses)
+
+These are the harnesses verified to work today. Anything that speaks the
+OpenAI Chat Completions / Responses or Anthropic Messages wire format should
+work too — these are just the ones with first-class setup helpers and docs.
+
+| Client / harness        | Wire format used                    | Endpoint                  | Setup                          |
+|-------------------------|-------------------------------------|---------------------------|--------------------------------|
+| **Codex CLI** (≥ 0.118) | OpenAI Responses (`wire_api = "responses"`) | `POST /v1/responses`      | `cllmp setup codex`            |
+| **Codex Desktop**       | OpenAI Responses *or* Chat Completions | `POST /v1/responses` or `/v1/chat/completions` | manual (Settings → Providers) |
+| **Claude Code CLI**     | Anthropic Messages (translated → chat-completions) | `POST /v1/messages`       | `cllmp setup claude`           |
+| Any OpenAI-compatible tool | OpenAI Chat Completions / Responses (passthrough) | `POST /v1/chat/completions`, `/v1/responses` | manual (point base URL at the proxy) |
+
+See [Auto-configure clients](#auto-configure-clients) for the one-command
+setup, or [Client setup (manual)](#client-setup-manual) to wire them up by
+hand.
 
 ## Requirements
 
@@ -88,13 +104,20 @@ cllmp start --debug                  # verbose logging
 # `cllmp serve` is identical to `cllmp start`.
 ```
 
-You should see:
+You should see a banner like:
 
 ```
-[...] [info] Copilot API token acquired.
+[...] [info] copilot-llm-proxy v0.2.0  pid=12345  node=v20.4.0
+[...] [info]   Auth:     C:\Users\<you>\.copilot-llm-proxy\auth.json
+[...] [info]   Token:    expires in ~30 min (auto-refreshed)
+[...] [info]   Models:   35 available on your Copilot subscription
+[...] [info]   Log level: info
 [...] [info] Listening on http://127.0.0.1:4141
-[...] [info]   OpenAI:    POST http://127.0.0.1:4141/v1/chat/completions
-[...] [info]   Anthropic: POST http://127.0.0.1:4141/v1/messages
+[...] [info]   OpenAI (chat):      POST http://127.0.0.1:4141/v1/chat/completions
+[...] [info]   OpenAI (responses): POST http://127.0.0.1:4141/v1/responses
+[...] [info]   Anthropic:          POST http://127.0.0.1:4141/v1/messages
+[...] [info]   Models:             GET  http://127.0.0.1:4141/v1/models
+[...] [info]   Health:             GET  http://127.0.0.1:4141/healthz
 ```
 
 Health check:
@@ -285,8 +308,11 @@ route, and round-trips natively on the Responses route.
   estimate — Claude Code will accept it but it is not exact.
 - **Vision.** Image blocks in Anthropic requests are forwarded as OpenAI
   `image_url` parts; Copilot's support varies by model.
-- **No `/v1/responses`.** Codex CLI/Desktop must be configured with
-  `wire_api = "chat"`.
+- **Upstream request-size limit.** Copilot's `/responses` rejects large
+  request bodies (a few MB) with `413 "failed to parse request"`. Long Codex
+  sessions can hit this; see
+  [Codex CLI (manual)](#codex-cli-manual) for the `model_auto_compact_token_limit`
+  fix and the `COPILOT_MAX_REQUEST_MB` / `COPILOT_REQUEST_WARN_MB` guards.
 - **No request retries.** If Copilot returns 429/5xx the error is
   forwarded to the client as-is.
 - **No persistent token cache.** A fresh API token is fetched per process
@@ -305,6 +331,7 @@ src/
     copilotToken.ts              # Exchange + cache short-lived API token
   copilot/
     client.ts                    # Upstream fetch wrapper (headers, streaming)
+    modelResolver.ts             # Maps client model ids → ids Copilot accepts
   routes/
     openai.ts                    # /v1/chat/completions, /v1/models
     anthropic.ts                 # /v1/messages, /v1/messages/count_tokens
@@ -312,13 +339,16 @@ src/
   setup/
     codex.ts                     # `cllmp setup codex`  → ~/.codex/config.toml
     claude.ts                    # `cllmp setup claude` → ~/.claude/settings.json
+    modelPicker.ts               # Interactive model picker for `setup`
     common.ts
   translators/
     anthropicToOpenAI.ts         # request: Anthropic → OpenAI
     openAIToAnthropic.ts         # response: OpenAI → Anthropic (sync + SSE)
   util/
+    accessLog.ts                 # One concise log line per request
     logger.ts
     sse.ts
+    version.ts                   # Resolves version from package.json at runtime
 ```
 
 ## License
