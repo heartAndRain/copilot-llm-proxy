@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import type { CopilotClient } from "../copilot/client.js";
 import type { ModelResolver } from "../copilot/modelResolver.js";
+import type { Config } from "../config.js";
 import { log } from "../util/logger.js";
 import { logRequest, summariseReasoning } from "../util/accessLog.js";
 
@@ -11,7 +12,11 @@ import { logRequest, summariseReasoning } from "../util/accessLog.js";
  *
  * This is what Codex CLI ≥ 0.118 requires (`wire_api = "responses"`).
  */
-export function createResponsesRouter(copilot: CopilotClient, resolver: ModelResolver): Router {
+export function createResponsesRouter(
+  copilot: CopilotClient,
+  resolver: ModelResolver,
+  config: Config,
+): Router {
   const router = Router();
 
   router.post("/responses", async (req: Request, res: Response) => {
@@ -21,6 +26,35 @@ export function createResponsesRouter(copilot: CopilotClient, resolver: ModelRes
         error: { message: "`input` is required", type: "invalid_request_error" },
       });
     }
+
+    // Guard against bodies Copilot will reject. A long/resumed Codex session
+    // re-sends its entire history every turn; once that exceeds Copilot's
+    // request-size cap it returns 413 "failed to parse request", which the
+    // client only shows as "(reconnecting)". We surface it early and clearly.
+    const bodyBytes = Number(req.headers["content-length"]) || 0;
+    const bodyMb = bodyBytes / (1024 * 1024);
+    if (config.maxRequestMb != null && bodyMb > config.maxRequestMb) {
+      log.warn(
+        `/v1/responses rejecting oversized request: ${bodyMb.toFixed(2)} MB > ` +
+          `COPILOT_MAX_REQUEST_MB=${config.maxRequestMb} MB. Compact/trim the session.`,
+      );
+      return res.status(413).json({
+        error: {
+          message:
+            `Request body is ${bodyMb.toFixed(2)} MB, over the configured ` +
+            `${config.maxRequestMb} MB limit. The conversation is too large for ` +
+            `Copilot — start a new session or run /compact, then retry.`,
+          type: "request_too_large",
+        },
+      });
+    }
+    if (bodyMb > config.requestWarnMb) {
+      log.warn(
+        `/v1/responses large request body: ${bodyMb.toFixed(2)} MB. Copilot may ` +
+          `reject bodies this large with 413; compact the session if it fails.`,
+      );
+    }
+
     const requestedModel = typeof body.model === "string" ? body.model : undefined;
     if (typeof body.model === "string") {
       body.model = await resolver.resolve(body.model);
@@ -54,6 +88,17 @@ export function createResponsesRouter(copilot: CopilotClient, resolver: ModelRes
       });
       upstreamStatus = upstream.status;
       res.status(upstream.status);
+      if (upstream.status >= 400) {
+        // Surface upstream failures in the proxy log. Otherwise errors like
+        // Copilot's 413 "failed to parse request" — which a long Codex session
+        // hits once its re-sent history grows past Copilot's request-size limit
+        // — are invisible here and the client only shows "(reconnecting)".
+        const errBody = await readAll(upstream.body);
+        log.warn(`/v1/responses upstream ${upstream.status}: ${truncate(errBody, 800)}`);
+        forwardJsonHeaders(upstream.headers, res);
+        res.end(errBody);
+        return;
+      }
       if (wantsStream) {
         forwardSseHeaders(upstream.headers, res);
       } else {
@@ -91,6 +136,18 @@ function forwardSseHeaders(src: Record<string, string | string[]>, res: Response
 function asString(v: string | string[] | undefined): string {
   if (!v) return "";
   return Array.isArray(v) ? v[0] ?? "" : v;
+}
+
+async function readAll(stream: NodeJS.ReadableStream): Promise<string> {
+  const chunks: Buffer[] = [];
+  for await (const c of stream) {
+    chunks.push(Buffer.isBuffer(c) ? c : Buffer.from(c));
+  }
+  return Buffer.concat(chunks).toString("utf8");
+}
+
+function truncate(s: string, max: number): string {
+  return s.length > max ? `${s.slice(0, max)}… (${s.length} bytes total)` : s;
 }
 
 function sendError(res: Response, err: unknown) {

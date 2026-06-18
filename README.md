@@ -148,6 +148,8 @@ Useful flags:
 cllmp setup codex  --url http://127.0.0.1:4141 --model gpt-5.5 --provider-name copilot
 cllmp setup codex  --no-model            # don't change Codex's default model
 cllmp setup codex  --no-default-provider # don't change Codex's top-level model_provider
+cllmp setup codex  --compact-limit 120000 # auto-compact sooner (default 160000)
+cllmp setup codex  --no-compact-limit    # don't set model_auto_compact_token_limit
 cllmp setup claude --url http://127.0.0.1:4141 --model claude-sonnet-4.6
 cllmp setup claude --no-model            # don't change Claude Code's default model
 cllmp setup codex  --config path/to/config.toml      # override config path
@@ -182,6 +184,13 @@ provider to `~/.codex/config.toml` (Windows:
 model = "gpt-5.5"
 model_provider = "copilot"
 
+# Make Codex auto-compact long conversations before they exceed Copilot's
+# request-size limit. Codex has no context-window metadata for a custom
+# provider's model, so without this it never auto-compacts and a long session
+# eventually fails with 413 "failed to parse request". Tune lower if you still
+# hit 413 (e.g. with many MCP servers, whose tool schemas are re-sent each turn).
+model_auto_compact_token_limit = 160000
+
 [model_providers.copilot]
 name = "GitHub Copilot"
 base_url = "http://127.0.0.1:4141/v1"
@@ -195,6 +204,15 @@ Then just run:
 ```powershell
 codex
 ```
+
+> **Why `model_auto_compact_token_limit`?** Codex decides when to compact
+> based on the model's token context window, but Copilot's `/responses`
+> rejects requests over a few MB regardless of token count. For a *custom*
+> provider Codex has no context-window info for the model, so auto-compaction
+> is effectively disabled and the conversation grows until Copilot returns
+> `413`. Setting this limit makes Codex compact in time. `cllmp setup codex`
+> writes it for you (default 160000; use `--compact-limit N` or
+> `--no-compact-limit`).
 
 ### Codex Desktop (manual)
 
@@ -223,6 +241,8 @@ All settings can be tuned via env vars:
 | `COPILOT_USER_AGENT`             | `GitHubCopilotChat/0.22.4`           | Sent as `User-Agent`                                     |
 | `COPILOT_INTEGRATION_ID`         | `vscode-chat`                        | Sent as `Copilot-Integration-Id`                         |
 | `GH_COPILOT_TOKEN`               | (auto-detect)                        | Override OAuth token instead of reading from disk        |
+| `COPILOT_REQUEST_WARN_MB`        | `3`                                  | Log a warning when a `/v1/responses` body exceeds this size (Copilot rejects large bodies with 413) |
+| `COPILOT_MAX_REQUEST_MB`         | unset                                | If set, reject `/v1/responses` bodies larger than this (MB) up front with a clear error |
 
 ## How the OAuth token is found
 

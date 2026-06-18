@@ -14,6 +14,13 @@ export interface CodexSetupOptions {
   configPath?: string;
   /** If true, also set top-level `model_provider = providerName`. Default true. */
   setDefaultProvider?: boolean;
+  /**
+   * Token count at which Codex auto-compacts the conversation. Codex never
+   * auto-compacts for custom OpenAI-compatible providers unless this (or a
+   * context window) is set, so a long session keeps re-sending its whole
+   * history until Copilot rejects it with 413. Pass `null` to leave unset.
+   */
+  autoCompactTokenLimit?: number | null;
 }
 
 export interface CodexSetupResult {
@@ -67,6 +74,18 @@ export async function setupCodex(opts: CodexSetupOptions): Promise<CodexSetupRes
   if (desiredModel != null && parsed.model !== desiredModel) {
     parsed.model = desiredModel;
     changed.push("model");
+  }
+
+  // Make Codex auto-compact before the conversation grows past Copilot's
+  // request-size limit. Without this, Codex has no context-window metadata for
+  // a custom provider's model and never auto-compacts, so long sessions fail
+  // with 413 "failed to parse request".
+  if (
+    opts.autoCompactTokenLimit != null &&
+    parsed.model_auto_compact_token_limit !== opts.autoCompactTokenLimit
+  ) {
+    parsed.model_auto_compact_token_limit = opts.autoCompactTokenLimit;
+    changed.push("model_auto_compact_token_limit");
   }
 
   // smol-toml's stringify expects a record at the top level.

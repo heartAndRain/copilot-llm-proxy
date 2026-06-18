@@ -130,6 +130,12 @@ setup
   )
   .option("--no-model", "Don't change the top-level `model` setting")
   .option("--no-default-provider", "Don't set the top-level `model_provider`")
+  .option(
+    "--compact-limit <tokens>",
+    "Token count at which Codex auto-compacts the conversation. Prevents long sessions from growing past Copilot's request-size limit (413). Default 160000.",
+    (v) => Number(v),
+  )
+  .option("--no-compact-limit", "Don't set Codex's `model_auto_compact_token_limit`")
   .option("--config <path>", "Override path to config.toml")
   .action(async (opts) => {
     try {
@@ -139,16 +145,22 @@ setup
         defaultId: "gpt-5.5",
         title: "Available OpenAI models on your Copilot subscription:",
       });
+      const autoCompactTokenLimit =
+        opts.compactLimit === false ? null : (opts.compactLimit ?? 160000);
       const result = await setupCodex({
         proxyUrl: opts.url,
         providerName: opts.providerName,
         model,
         setDefaultProvider: opts.defaultProvider !== false,
+        autoCompactTokenLimit,
         configPath: opts.config,
       });
       printSetupSummary("Codex", result.configPath, result.changedKeys, result.backupPath, [
         `Make sure \`cllmp start\` is running on ${opts.url}.`,
         `No API key needed — the proxy ignores Authorization.`,
+        ...(autoCompactTokenLimit != null
+          ? [`Codex will auto-compact at ~${autoCompactTokenLimit} tokens to avoid Copilot's request-size limit.`]
+          : []),
       ]);
     } catch (err) {
       console.error("✗", err instanceof Error ? err.message : err);

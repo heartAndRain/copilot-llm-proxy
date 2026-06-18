@@ -51,7 +51,7 @@ export async function startServer(config: Config) {
 
   app.use("/v1", createOpenAIRouter(copilot, resolver));
   app.use("/v1", createAnthropicRouter(copilot, resolver));
-  app.use("/v1", createResponsesRouter(copilot, resolver));
+  app.use("/v1", createResponsesRouter(copilot, resolver, config));
 
   return new Promise<void>((resolve, reject) => {
     const server = app.listen(config.port, config.host, () => {

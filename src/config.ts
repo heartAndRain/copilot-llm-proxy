@@ -9,9 +9,21 @@ export interface Config {
   integrationId: string;
   // Optional override: if set, use this OAuth token instead of reading from disk
   oauthTokenOverride?: string;
+  // Log a warning when a request body exceeds this many MB (Copilot's
+  // `/responses` rejects large bodies with 413 "failed to parse request").
+  requestWarnMb: number;
+  // If set, reject requests whose body exceeds this many MB *before* sending
+  // them upstream, with a clear actionable error. Unset = no hard limit.
+  maxRequestMb?: number;
 }
 
 const envBool = (v: string | undefined) => v === "1" || v === "true";
+
+const envNum = (v: string | undefined): number | undefined => {
+  if (v == null || v === "") return undefined;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : undefined;
+};
 
 export function loadConfig(overrides: Partial<Config> = {}): Config {
   return {
@@ -29,6 +41,8 @@ export function loadConfig(overrides: Partial<Config> = {}): Config {
     userAgent: process.env.COPILOT_USER_AGENT ?? "GitHubCopilotChat/0.22.4",
     integrationId: process.env.COPILOT_INTEGRATION_ID ?? "vscode-chat",
     oauthTokenOverride: process.env.GH_COPILOT_TOKEN,
+    requestWarnMb: envNum(process.env.COPILOT_REQUEST_WARN_MB) ?? 3,
+    maxRequestMb: envNum(process.env.COPILOT_MAX_REQUEST_MB),
     ...overrides,
   };
 }

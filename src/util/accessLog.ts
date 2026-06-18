@@ -35,7 +35,7 @@ export function logRequest(
       if (v == null || v === "" || v === false) continue;
       parts.push(`${k}=${v}`);
     }
-    if (res.statusCode >= 500) log.warn(parts.join(" "));
+    if (res.statusCode >= 400) log.warn(parts.join(" "));
     else log.info(parts.join(" "));
   };
   res.on("finish", finalize);
